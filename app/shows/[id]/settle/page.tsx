@@ -159,7 +159,7 @@ export default async function SettlePage({
             expenseRowCount={expenses.length}
           />
         ) : (
-          <SupportedSettlement calc={calc} existingSettlement={settlement} />
+          <SupportedSettlement calc={calc} existingSettlement={settlement} deal={deal} />
         )}
 
         {recoups.length > 0 && <RecoupsSection recoups={recoups} />}
@@ -531,6 +531,7 @@ function UnsupportedDeal({
 function SupportedSettlement({
   calc,
   existingSettlement,
+  deal,
 }: {
   calc: Extract<
     ReturnType<typeof calculateSettlement>,
@@ -539,6 +540,7 @@ function SupportedSettlement({
   existingSettlement: NonNullable<
     Awaited<ReturnType<typeof getShowById>>
   >["settlement"];
+  deal: NonNullable<Awaited<ReturnType<typeof getShowById>>>["deal"];
 }) {
   return (
     <>
@@ -643,6 +645,25 @@ function SupportedSettlement({
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {deal?.dealNotesFreetext && (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Deal notes</CardTitle>
+              <CardDescription>
+                What Mariana actually agreed to — the structured fields above may
+                not capture the full deal terms.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-[12.5px] text-ink-800 bg-canvas-soft rounded-lg p-4 ring-1 ring-ink-200/60 leading-relaxed">
+              {deal.dealNotesFreetext}
+            </div>
           </CardContent>
         </Card>
       )}
