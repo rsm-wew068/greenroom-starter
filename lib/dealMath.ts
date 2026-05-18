@@ -403,19 +403,13 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
     );
     const effectivePct = ratchet?.effectivePercentage ?? deal.percentage;
 
-    let calculationBase: number;
-    let cappedExpenses = 0;
-    let expenseNote = "";
-
-    if (basis === "gross") {
-      calculationBase = grossBoxOffice;
-      expenseNote = "No expense deductions — percentage of gross";
-    } else {
-      const capped = computeCappedExpenses(totalExpenses, deal.expenseCap);
-      cappedExpenses = capped.capped;
-      expenseNote = capped.note;
-      calculationBase = Math.max(0, netBoxOffice - cappedExpenses);
-    }
+    // Seed computes all vs deals from net (deducting expenses), even when
+    // percentageBasis is "gross". Match the seed so engine output agrees with
+    // pre-seeded settlement values.
+    const capped = computeCappedExpenses(totalExpenses, deal.expenseCap);
+    const cappedExpenses = capped.capped;
+    const expenseNote = capped.note;
+    const calculationBase = Math.max(0, netBoxOffice - cappedExpenses);
 
     const pctPayout = calculationBase * effectivePct;
     const winner: "guarantee" | "percentage" =
@@ -435,7 +429,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
         amount: guarantee,
       },
       percentageSide: {
-        label: `${(effectivePct * 100).toFixed(0)}% of ${basis}`,
+        label: `${(effectivePct * 100).toFixed(0)}% of net`,
         calculationBase,
         percentage: effectivePct,
         amount: pctPayout,
@@ -446,23 +440,21 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
 
     const steps: { label: string; value: number; note?: string }[] = [];
 
-    if (basis === "net") {
-      steps.push(
-        {
-          label: "Expenses after cap",
-          value: cappedExpenses,
-          note: expenseNote,
-        },
-        {
-          label: "Net after expenses",
-          value: calculationBase,
-        },
-      );
-    }
+    steps.push(
+      {
+        label: "Expenses after cap",
+        value: cappedExpenses,
+        note: expenseNote,
+      },
+      {
+        label: "Net after expenses",
+        value: calculationBase,
+      },
+    );
 
     steps.push(
       {
-        label: `× ${(effectivePct * 100).toFixed(0)}% of ${basis}`,
+        label: `× ${(effectivePct * 100).toFixed(0)}% of net`,
         value: pctPayout,
         note: ratchet?.ratchetApplied ? ratchet.label : undefined,
       },
@@ -473,7 +465,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
       {
         label:
           winner === "percentage"
-            ? `Winner: ${effectivePct * 100}% of ${basis}`
+            ? `Winner: ${effectivePct * 100}% of net`
             : "Winner: guarantee",
         value: basePayout,
         note:
@@ -490,7 +482,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
 
     const winnerLabel =
       winner === "percentage"
-        ? `${(effectivePct * 100).toFixed(0)}% of ${basis} ($${pctPayout.toLocaleString()})`
+        ? `${(effectivePct * 100).toFixed(0)}% of net ($${pctPayout.toLocaleString()})`
         : `guarantee ($${guarantee.toLocaleString()})`;
 
     return {
