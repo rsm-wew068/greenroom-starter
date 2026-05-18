@@ -45,8 +45,8 @@ export default async function ReportsPage() {
     (r.settlementStatus.signed ?? 0) +
     (r.settlementStatus.finalized ?? 0);
 
-  const unsupportedPct = (100 - r.inAppToolUsageRate * 100).toFixed(0);
   const disputedPct = (r.disputedRate * 100).toFixed(1);
+  const supportedPct = (r.inAppToolUsageRate * 100).toFixed(0);
 
   return (
     <div className="px-12 py-10 max-w-7xl">
@@ -116,12 +116,12 @@ export default async function ReportsPage() {
                 className="text-[64px] font-mono tabular font-bold text-amber-800 leading-none"
                 style={{ letterSpacing: "-0.03em" }}
               >
-                {unsupportedPct}%
+                {100 - Number(supportedPct)}%
               </div>
               <p className="text-[12.5px] text-ink-600 mt-4 leading-relaxed max-w-sm">
-                At The Crescent, {unsupportedPct}% of deals — Vs deals, % of net, and
-                door deals — are deal types the in-app tool can&apos;t settle.
-                Across all customers, only about 18% actively use the tool at all.
+                Vs deals, % of net, and door deals previously couldn&apos;t be settled
+                in the in-app tool. All five deal types are now supported
+                with step-by-step math.
               </p>
             </div>
           </div>
@@ -332,8 +332,8 @@ export default async function ReportsPage() {
           <CardContent>
             <div className="space-y-[6px]">
               {dealMix.map(({ type, count, pct }) => {
-                const supported =
-                  type === "flat" || type === "percentage_of_gross";
+                const supportedTypes = ["flat", "percentage_of_gross", "percentage_of_net", "vs", "door"];
+                const supported = supportedTypes.includes(type);
                 const maxCount = Math.max(...dealMix.map((d) => d.count));
                 const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
                 const friendly: Record<string, string> = {

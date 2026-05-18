@@ -11,6 +11,7 @@ import {
   XCircle,
   Wallet,
   TrendingUp,
+  AlertCircle,
 } from "lucide-react";
 import { getShowById } from "@/lib/queries";
 import {
@@ -22,7 +23,7 @@ import {
   Field,
 } from "@/components/ui/card";
 import { StatusBadge, DealTypeBadge, PlainBadge } from "@/components/ui/badge";
-import { calculateSettlement } from "@/lib/dealMath";
+import { calculateSettlement, type VsBreakdown } from "@/lib/dealMath";
 import {
   formatMoney,
   formatShowDateFull,
@@ -107,7 +108,7 @@ export default async function SettlePage({
         </div>
       </div>
 
-      {/* Disputed callout */}
+      {/* Disputed recoup callout */}
       {isDisputed && disputedRecoupValue > 0 && (
         <div className="mb-8 rounded-lg border border-rose-200/60 bg-rose-50/40 p-5 flex gap-3">
           <AlertTriangle className="h-4 w-4 text-rose-700 mt-0.5 shrink-0" />
@@ -117,6 +118,25 @@ export default async function SettlePage({
             </div>
             <p className="text-[12.5px] text-ink-600 mt-1 leading-relaxed">
               The artist team has flagged recoup line items. This settlement cannot be finalized until the dispute is resolved.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Status inconsistency: disputed but sign-off is positive */}
+      {isStatusSignoffMismatch(settlement) && (
+        <div className="mb-8 rounded-lg border border-amber-200/60 bg-gradient-to-r from-amber-50/60 to-canvas p-5 flex gap-3">
+          <AlertCircle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+          <div>
+            <div className="text-[13px] font-semibold text-amber-800">
+              Status conflict · marked disputed, but sign-off is positive
+            </div>
+            <p className="text-[12.5px] text-ink-600 mt-1 leading-relaxed">
+              This settlement is marked <span className="font-mono text-rose-700">&quot;disputed&quot;</span> but
+              the artist team&apos;s sign-off reads as approval:{" "}
+              <span className="italic">&ldquo;{settlement?.signoffText}&rdquo;</span>
+              {" "}&mdash; likely resolved informally without updating the status. The numbers are
+              probably final, but the record doesn&apos;t reflect that.
             </p>
           </div>
         </div>
@@ -174,6 +194,29 @@ export default async function SettlePage({
       </div>
     </div>
   );
+}
+
+const POSITIVE_PATTERNS = [
+  /\blooks good\b/i,
+  /\blooks great\b/i,
+  /\bok\b/i,
+  /\bgood night\b/i,
+  /\bwire\b/i,
+  /👍/,
+  /\bapproved?\b/i,
+  /\bsounds good\b/i,
+  /\bthanks\b/i,
+  /\bconfirmed\b/i,
+];
+
+function isStatusSignoffMismatch(
+  settlement: Settlement | null | undefined,
+): boolean {
+  if (!settlement) return false;
+  if (settlement.status !== "disputed") return false;
+  if (!settlement.signoffText) return false;
+  const text = settlement.signoffText;
+  return POSITIVE_PATTERNS.some((p) => p.test(text));
 }
 
 function BackLink({ showId }: { showId: string }) {
@@ -531,6 +574,9 @@ function SupportedSettlement({
         )}
       </div>
 
+      {/* VS comparison — only for vs deals */}
+      {calc.vsBreakdown && <VsComparison breakdown={calc.vsBreakdown} />}
+
       {/* Worksheet breakdown */}
       <Card accent="brand">
         <CardHeader>
@@ -601,6 +647,107 @@ function SupportedSettlement({
         </Card>
       )}
     </>
+  );
+}
+
+function VsComparison({ breakdown }: { breakdown: VsBreakdown }) {
+  const { guaranteeSide, percentageSide, winner } = breakdown;
+
+  return (
+    <Card accent="brand">
+      <CardHeader>
+        <div>
+          <CardTitle>Guarantee vs Percentage</CardTitle>
+          <CardDescription>
+            The artist receives whichever side pays more. Here&apos;s how the two sides compare.
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent className="divide-y divide-ink-100/80">
+        {/* Guarantee side */}
+        <div className="flex items-baseline justify-between py-3.5">
+          <div className="min-w-0">
+            <div className="text-[13px] text-ink-600">{guaranteeSide.label}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            {winner === "guarantee" && (
+              <PlainBadge variant="brand">Winner</PlainBadge>
+            )}
+            <span
+              className={`text-[15px] font-mono tabular font-semibold ${
+                winner === "guarantee" ? "text-ink-900" : "text-ink-400"
+              }`}
+            >
+              {formatMoney(guaranteeSide.amount)}
+            </span>
+          </div>
+        </div>
+
+        {/* Percentage side */}
+        <div className="flex items-baseline justify-between py-3.5">
+          <div className="min-w-0">
+            <div className="text-[13px] text-ink-600">
+              {percentageSide.label}
+            </div>
+            <div className="text-[11.5px] text-ink-400 mt-0.5">
+              {formatMoney(percentageSide.calculationBase)} base ×{" "}
+              {(percentageSide.percentage * 100).toFixed(0)}%
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {winner === "percentage" && (
+              <PlainBadge variant="brand">Winner</PlainBadge>
+            )}
+            <span
+              className={`text-[15px] font-mono tabular font-semibold ${
+                winner === "percentage" ? "text-ink-900" : "text-ink-400"
+              }`}
+            >
+              {formatMoney(percentageSide.amount)}
+            </span>
+          </div>
+        </div>
+
+        {/* Explanatory note */}
+        <div className="pt-3">
+          <p className="text-[12px] text-ink-500 leading-relaxed">
+            {winner === "percentage" ? (
+              <>
+                The percentage side (
+                <span className="font-mono tabular text-ink-700">
+                  {formatMoney(percentageSide.amount)}
+                </span>
+                ) paid out more than the guarantee (
+                <span className="font-mono tabular text-ink-700">
+                  {formatMoney(guaranteeSide.amount)}
+                </span>
+                ), so the artist receives{" "}
+                <span className="font-mono tabular font-medium text-ink-900">
+                  {formatMoney(breakdown.basePayout)}
+                </span>{" "}
+                as the base payout.
+              </>
+            ) : (
+              <>
+                The guarantee (
+                <span className="font-mono tabular text-ink-700">
+                  {formatMoney(guaranteeSide.amount)}
+                </span>
+                ) exceeded the percentage side (
+                <span className="font-mono tabular text-ink-700">
+                  {formatMoney(percentageSide.amount)}
+                </span>
+                ), so the artist receives the guaranteed{" "}
+                <span className="font-mono tabular font-medium text-ink-900">
+                  {formatMoney(breakdown.basePayout)}
+                </span>
+                .
+              </>
+            )}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
