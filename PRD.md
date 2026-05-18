@@ -27,7 +27,7 @@ I chose **deal math and auditability** because it's the blocking dependency. You
 ## What I Built
 
 **Settlement engine** (`lib/dealMath.ts`) — extended from 2 to all 5 deal types:
-- **Vs deals** — guarantee vs % of net/gross, including walkout pots, tier ratchets, and vs-gross variants
+- **Vs deals** — guarantee vs % of net/gross, including walkout pots, tier ratchets, and vs-gross variants. The engine respects `percentageBasis`: vs-gross computes from gross (no expense deductions), vs-net from net.
 - **Percentage-of-net** with expense caps and step-by-step deduction
 - **Door deals** (gross minus capped expenses)
 - Tier ratchet resolution (fill-ratio-based percentage escalation)
@@ -37,7 +37,9 @@ I chose **deal math and auditability** because it's the blocking dependency. You
 
 **Step-by-step derivation** — every supported deal shows intermediate numbers (gross, fees, net, capped expenses, percentage applied, bonuses triggered/not triggered).
 
-**Status inconsistency detection** — 22 of 24 "disputed" settlements in the data have positive sign-off text ("Looks good — TM", "wire monday", "👍"). The settlement page now flags this contradiction: a settlement marked disputed but with approving sign-off was likely resolved informally without updating the record.
+**Deal notes on all settlements** — the brief says "the deal notes_freetext field is the truth." Every settlement now shows the free-text deal notes alongside the structured worksheet, so Mariana can cross-reference what she actually agreed to.
+
+**Status inconsistency detection** — 22 of 24 "disputed" settlements in the data have positive sign-off text ("Looks good — TM", "wire monday", "👍"). The settlement page flags this contradiction. Similarly, the 17 vs-gross deals in the seeded data were settled by the seed using net (the seed ignored `percentageBasis`); the engine now computes correctly from gross, and the "Originally settled at" line surfaces the discrepancy.
 
 ## Design Decisions
 
@@ -45,7 +47,7 @@ I chose **deal math and auditability** because it's the blocking dependency. You
 
 **Trust through transparency, not simplification.** I show every intermediate step rather than collapsing the math. The audience is not just Mariana — it's Diego across the table at 2am, and Sarah reading the statement the next morning. Hiding the work erodes trust.
 
-**Match the seed's math.** The engine produces identical numbers to the seed's reference function. Verified against show_0002 (a vs deal): engine and pre-seeded settlement both agree on $5,197.50.
+**Match the seed's math — except where the data model is right.** For vs-net deals (the majority), the engine produces identical numbers to the seed. For vs-gross deals, the seed ignored `percentageBasis` and always computed from net. The engine now correctly computes from gross, which means it disagrees with 17 pre-seeded settlements. This is intentional: the "Originally settled at" line surfaces the discrepancy as a data inconsistency, the same way the disputed+positive-signoff detection does.
 
 ## What I Cut
 
